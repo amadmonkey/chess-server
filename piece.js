@@ -12,8 +12,13 @@ class Piece {
         this.id = `${isLight ? 'light' : 'dark'}-${pieceName}-${index}`;
         this.isLight = isLight;
         this.pieceName = pieceName;
+        this.isInitial = true;
         this.position = position;
         this.rules = rules;
+        this.active = true;
+    }
+    setPosition({position = ""}){
+        this.position = position;
     }
 }
 
@@ -31,8 +36,14 @@ const getPieceRules = (pieceName) => {
     switch(pieceName){
         case PieceNames.PAWN:
             return [
-                'x-1:y0',
-                'x-2:y0',
+                {
+                    rule:'x-1:y0',
+                    condition: 'NO_PIECE'
+                },
+                {
+                    rule: 'x-2:y0',
+                    condition: 'INITIAL'
+                },
                 {
                     rule: 'x-1:y-1',
                     condition: 'HAS_OPPONENT'
@@ -44,8 +55,14 @@ const getPieceRules = (pieceName) => {
             ];
         case PieceNames.ROOK:
             return [
-                'x*:y0',
-                'x0:y*'
+                {
+                    rule: 'x*:y0',
+                    condition: 'UNTIL_OPPONENT'
+                },
+                {
+                    rule: 'x0:y*',
+                    condition: 'UNTIL_OPPONENT'
+                }
             ];
         case PieceNames.KNIGHT:
             return [
@@ -56,11 +73,14 @@ const getPieceRules = (pieceName) => {
                 'x+1:y-2',
                 'x+1:y+2',
                 'x+2:y-1',
-                'x+2:y+2',
+                'x+2:y+1',
             ];
         case PieceNames.BISHOP:
             return [
-                'x*=y*'
+                {
+                    rule: 'x*=y*',
+                    condition: 'UNTIL_OPPONENT'
+                }
             ];
         case PieceNames.QUEEN:
             return [
@@ -80,11 +100,11 @@ const getPieceRules = (pieceName) => {
                 'x+1:y+1',
                 {
                     rule: 'x-2:y0',
-                    condition: 'CASTLING'
+                    condition: 'INITIAL'
                 },
                 {
                     rule: 'x+2:y0',
-                    condition: 'CASTLING'
+                    condition: 'INITIAL'
                 }
             ];
     }

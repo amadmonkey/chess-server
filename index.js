@@ -22,55 +22,81 @@ const defNamespace = io.of('/');
 // const chat = io.of('/chat-namespace');
 // const chess = io.of('/chess-namespace');
 
+function generateId(length) {
+    var result           = '';
+    var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    var charactersLength = characters.length;
+    for ( var i = 0; i < length; i++ ) {
+       result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+}
+
+
 let LOBBIES = {};
+
+class LOBBY {
+    constructor({host=null}){
+        this.roomId = generateId(4);
+        this.host = host;
+        this.host.isLight = Math.random() > 0.5;
+        this.guest = null;
+        this.turn = true;
+        this.chat = []
+        this.set = {
+            light: chess.SET({ isLight: true }),
+            dark: chess.SET({ isLight: false })
+        }
+    }
+    getId(){
+        return this.roomId;
+    }
+    createGuest({guest=null}){
+        this.guest = guest;
+        this.guest.isLight = !this.host.isLight;
+    }
+}
+
+
 
 defNamespace.on('connection', (socket) => {
     
     console.log('a user connected');
 
-    socket.on('cancel-room', (params) => {
-        console.log('canceled room ' + params.roomId);
-        delete LOBBIES[params.roomId];
-    });
-
     socket.on('create-room-request', (params) => {
+        console.log('create-room-request');
+        const newLobby = new LOBBY({host: params});
         socket.userDetails = params;
-        LOBBIES[params.roomId] = {
-            host: params,
-            roomId: params.roomId,
-            chat: [],
-            turn: null,
-            set: {
-                light: chess.SET({ isLight: true }),
-                dark: chess.SET({ isLight: false })
-            }
-        }
-        socket.join(params.roomId);
-        let set = {
-            user: LOBBIES[params.roomId].set[params.isLight ? 'light' : 'dark'],
-            opponent: LOBBIES[params.roomId].set[!params.isLight ? 'light' : 'dark']
-        }
-        socket.emit('create-room-response', {userDetails: params, set: set});
+        socket.join(newLobby.getId());
+        LOBBIES[newLobby.getId()] = newLobby;
+        socket.emit('create-room-response', LOBBIES[newLobby.getId()]);
     });
 
     socket.on('join-room-request', (params) => {
-        if(LOBBIES[params.roomId] && io.sockets.adapter.rooms[params.roomId].length < 2){
-            params.isLight = !LOBBIES[params.roomId].host.isLight;
+        console.log('join-room-request');
+        let LOBBY = LOBBIES[params.roomId];
+        if(LOBBY && io.sockets.adapter.rooms[params.roomId].length < 2){ // if lobby exists && has no more than 1 clients connected
             socket.userDetails = params;
             socket.join(params.roomId);
-            let set = {
-                host: LOBBIES[params.roomId].set[LOBBIES[params.roomId].host.isLight ? 'light' : 'dark'],
-                guest: LOBBIES[params.roomId].set[params.isLight ? 'light' : 'dark']
-            }
-            LOBBIES[params.roomId].turn = 'light';
-            defNamespace.in(params.roomId).emit('join-room-response', {hostDetails: LOBBIES[params.roomId].host, turn: true, guestDetails: params, set: set});
+            LOBBY.createGuest({guest: params});
+            defNamespace.in(params.roomId).emit('join-room-response', LOBBY);
         } else {
             // send only to the one trying to join: either incorrect roomId or room already has 2 clients
             socket.emit('join-room-response', null);
         }
     })
 
+    socket.on('leave-room', (params) => {
+        console.log('leave-room');
+        if(LOBBIES[params.roomId]) {
+            console.log('canceled room ' + params.roomId);
+            delete LOBBIES[params.roomId];
+        }
+        defNamespace.in(socket.userDetails.roomId).emit('logout-response');
+    });
+
     socket.on('chat-request', (params) => {
+        console.log('chat-request');
         const user = socket.userDetails 
         params.type = null;
         params.nickname = user.nickname;
@@ -81,43 +107,65 @@ defNamespace.on('connection', (socket) => {
     });
 
     socket.on('chat-typing', (params) => {
+        console.log('chat-typing');
         console.info(params.nickname, 'is typing');
         socket.to(params.roomId).emit('chat-typing', `${params.nickname} is typing...`);
     });
 
     socket.on('chess-move-request', (params) => {
         console.log('chess-move-request');
-        let set, set_opponent;
-        if(socket.userDetails.isLight){
-            set = LOBBIES[socket.userDetails.roomId].set['light'];
-            set_opponent = LOBBIES[socket.userDetails.roomId].set['dark'];
-        } else {
-            set = LOBBIES[socket.userDetails.roomId].set['dark'];
-            set_opponent = LOBBIES[socket.userDetails.roomId].set['light'];
+        let set, message;
+
+        if(params.opponentPiece){ // if eating update the opposing piece
+            set = LOBBIES[params.roomId].set[!params.holdingPiece.isLight ? 'light':'dark'];
+            for(let x = 0; x < set.length; x++){
+                if(set[x].id === params.opponentPiece.id){
+                    set[x].active = false;
+                    break;
+                }
+            }
         }
 
-        params.nickname = 'game';
-        params.type = "game";
+        set = LOBBIES[params.roomId].set[params.holdingPiece.isLight ? 'light':'dark'];
         for(let x = 0; x < set.length; x++){
-            if(set[x].id === params.id) {
-                params.message = `${set[x].pieceName}:${set[x].position} to ${params.position}`;
-                set[x].position = params.position;
+            if(set[x].id === params.holdingPiece.id){
+                message = `${set[x].pieceName}:${set[x].position} to ${params.position}`;
+                set[x].position = params.newPosition;
                 break;
             }
         }
 
-        LOBBIES[socket.userDetails.roomId].chat.push(params);
-        defNamespace.in(socket.userDetails.roomId).emit('chat-response', params, LOBBIES[socket.userDetails.roomId].chat);
-        defNamespace.in(socket.userDetails.roomId).emit('chess-move-response', !socket.userDetails.isLight, set, set_opponent);
+        // if(params.holdingPiece.isLight){
+        //     set = LOBBIES[params.roomId].set['light'];
+        //     set_opponent = LOBBIES[params.roomId].set['dark'];
+        // } else {
+        //     set = LOBBIES[params.roomId].set['dark'];
+        //     set_opponent = LOBBIES[params.roomId].set['light'];
+        // }
+
+        // params.nickname = 'game';
+        // params.type = "game";
+        // for(let x = 0; x < set.length; x++){
+        //     set[x].isInitial = false;
+        //     if(set[x].id === params.id) {
+        //         params.message = `${set[x].pieceName}:${set[x].position} to ${params.position}`;
+        //         set[x].setPosition({position: params.position});
+        //         break;
+        //     }
+        // }
+        LOBBIES[params.roomId].chat.push(params);
+        defNamespace.in(params.roomId).emit('chat-response', { nickname: params.user.nickname, type: 'game', message: message }, LOBBIES[params.roomId].chat);
+        defNamespace.in(params.roomId).emit('chess-move-response', !params.holdingPiece.isLight, LOBBIES[params.roomId].set[params.holdingPiece.isLight ? 'light':'dark'], LOBBIES[params.roomId].set[params.holdingPiece.isLight ? 'dark':'light']);
     });
 
     socket.on('validate-session', (params) => {
+        console.info('validate-session', params);
         if(params){
             if(LOBBIES[params.roomId]) {
                 // exists: rejoin room
-                socket.userDetails = params;
+                socket.user = params.user;
                 socket.join(params.roomId);
-                socket.emit('chat-list', LOBBIES[params.roomId].chat);
+                socket.emit('validate-response', LOBBIES[params.roomId]);
             } else {
                 // room doesnt exist. log user out
                 socket.emit('logout');
@@ -125,15 +173,6 @@ defNamespace.on('connection', (socket) => {
         } else {
             socket.emit('logout');
         }
-    });
-
-    socket.on('logout-request', (params) => {
-        if(LOBBIES[params.roomId]) {
-            console.log('canceled room ' + params.roomId);
-            delete LOBBIES[params.roomId];
-        }
-        defNamespace.in(socket.userDetails.roomId).emit('logout-response');
-        socket.emit('chat message', 'a user disconnected');
     });
 
     socket.on('disconnect', (params) => {
