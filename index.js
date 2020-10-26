@@ -1,6 +1,6 @@
 var app = require('express')();
 var http = require('http').createServer(app);
-var io = require('socket.io')(http);
+var io = require('socket.io')(http, { origins: '*:*'});
 var chess = require('./piece');
 
 const _PORT = 8080;
@@ -59,7 +59,7 @@ class LOBBY {
 
 
 
-defNamespace.on('connection', (socket) => {
+io.on('connection', (socket) => {
     
     console.log('a user connected');
 
@@ -80,11 +80,11 @@ defNamespace.on('connection', (socket) => {
                 socket.user = params;
                 socket.join(params.roomId);
                 LOBBY.createGuest({guest: params});
-                defNamespace.in(params.roomId).emit('join-room-response', LOBBY);
+                io.in(params.roomId).emit('join-room-response', LOBBY);
             } else if(LOBBY.host.nickname === params.nickname || LOBBY.guest.nickname === params.nickname){
                 socket.user = params;
                 socket.join(params.roomId);
-                defNamespace.in(params.roomId).emit('join-room-response', LOBBY);
+                io.in(params.roomId).emit('join-room-response', LOBBY);
             }
         } else {
             socket.emit('join-room-response', null); // send only to the one trying to join: either incorrect roomId or room already has 2 clients
@@ -97,7 +97,7 @@ defNamespace.on('connection', (socket) => {
             console.log('canceled room ' + params.roomId);
             delete LOBBIES[params.roomId];
         }
-        defNamespace.in(params.roomId).emit('logout-response', params);
+        io.in(params.roomId).emit('logout-response', params);
     });
 
     socket.on('chat-request', (params) => {
@@ -178,8 +178,8 @@ defNamespace.on('connection', (socket) => {
     
             LOBBIES[params.roomId].chat.push(params);
             LOBBIES[params.roomId].turn = !params.holdingPiece.isLight;
-            defNamespace.in(params.roomId).emit('chat-response', LOBBIES[params.roomId].chat, !params.holdingPiece.isLight, done);
-            defNamespace.in(params.roomId).emit('chess-move-response', !params.holdingPiece.isLight, LOBBIES[params.roomId].set[params.holdingPiece.isLight ? 'light':'dark'], LOBBIES[params.roomId].set[params.holdingPiece.isLight ? 'dark':'light'], done);
+            io.in(params.roomId).emit('chat-response', LOBBIES[params.roomId].chat, !params.holdingPiece.isLight, done);
+            io.in(params.roomId).emit('chess-move-response', !params.holdingPiece.isLight, LOBBIES[params.roomId].set[params.holdingPiece.isLight ? 'light':'dark'], LOBBIES[params.roomId].set[params.holdingPiece.isLight ? 'dark':'light'], done);
         } else {
             socket.emit('logout');
         }
