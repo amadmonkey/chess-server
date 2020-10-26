@@ -1,6 +1,6 @@
 var app = require('express')();
-var http = require('https').createServer(app);
-var io = require('socket.io')(http, { origins: '*:*'});
+var http = require('http').createServer(app);
+var io = require('socket.io')(http);
 var chess = require('./piece');
 
 // app.use((req, res) => res.sendFile('/index.html', { root: __dirname }));
@@ -47,18 +47,6 @@ class LOBBY {
         this.guest.isLight = !this.host.isLight;
     }
 }
-
-app.get('/', (req, res) => {
-    request(
-        { url: `https://api.rawg.io/api/games` },
-        (error, response, body) => {
-            if (error || response.statusCode !== 200) {
-                return res.status(500).json({ type: 'error', message: err.message });
-            }
-            res.json(JSON.parse(body));
-        }
-    )
-})
 
 io.on('connection', (socket) => {
     
