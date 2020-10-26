@@ -165,7 +165,7 @@ io.on('connection', (socket) => {
             LOBBIES[params.roomId].chat.push(params);
             LOBBIES[params.roomId].turn = !params.holdingPiece.isLight;
             io.in(params.roomId).emit('chat-response', LOBBIES[params.roomId].chat, !params.holdingPiece.isLight, done);
-            io.in(params.roomId).emit('chess-move-response', !params.holdingPiece.isLight, LOBBIES[params.roomId].set[params.holdingPiece.isLight ? 'light':'dark'], LOBBIES[params.roomId].set[params.holdingPiece.isLight ? 'dark':'light'], done);
+            !done && io.in(params.roomId).emit('chess-move-response', !params.holdingPiece.isLight, LOBBIES[params.roomId].set[params.holdingPiece.isLight ? 'light':'dark'], LOBBIES[params.roomId].set[params.holdingPiece.isLight ? 'dark':'light'], done);
         } else {
             socket.emit('logout');
         }
