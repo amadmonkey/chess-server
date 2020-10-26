@@ -3,9 +3,9 @@ var http = require('https').createServer(app);
 var io = require('socket.io')(http, { origins: '*:*'});
 var chess = require('./piece');
 
-const _PORT = 3000;
+const _PORT = process.env.PORT || 8080;
 
-app.set('port', process.env.PORT || _PORT);
+app.set('port', _PORT);
 
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
