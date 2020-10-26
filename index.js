@@ -3,16 +3,8 @@ var http = require('https').createServer(app);
 var io = require('socket.io')(http, { origins: '*:*'});
 var chess = require('./piece');
 
-const _PORT = process.env.PORT || 8080;
-
-app.set('port', _PORT);
-
-app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/index.html');
-});
-
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
     next();
@@ -206,4 +198,5 @@ io.on('connection', (socket) => {
 
 });
 
+const _PORT = process.env.PORT || 8080;
 app.listen(_PORT, () => console.log(`listening on *:${_PORT}`));
