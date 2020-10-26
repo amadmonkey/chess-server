@@ -1,5 +1,6 @@
 var app = require('express')();
 var cors = require('cors');
+app.use(cors());
 var http = require('http').createServer(app);
 var io = require('socket.io')(http);
 var chess = require('./piece');
@@ -9,7 +10,7 @@ var corsOptions = {
     optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
 }
 
-http.use(cors());
+// http.use(cors());
 
 // https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
 function generateId(length) {
