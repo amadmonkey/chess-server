@@ -4,12 +4,12 @@ var http = require('http').createServer(app);
 var io = require('socket.io')(http);
 var chess = require('./piece');
 
-http.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-    next();
-});
+var corsOptions = {
+    origin: 'https://amadmonkey.github.io/',
+    optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
+}
+
+http.use(cors());
 
 // https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
 function generateId(length) {
