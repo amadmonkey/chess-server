@@ -13,7 +13,12 @@ var chess = require('./piece');
 //     next();
 // });
 
-app.use(cors());
+var corsOptions = {
+    origin: 'https://amadmonkey.github.io/',
+    optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
+}
+
+http.use(cors());
 
 // https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
 function generateId(length) {
@@ -202,4 +207,4 @@ io.on('connection', (socket) => {
 });
 
 const _PORT = process.env.PORT || 8080;
-app.listen(_PORT, () => console.log(`listening on *:${_PORT}`));
+http.listen(_PORT, () => console.log(`listening on *:${_PORT}`));
