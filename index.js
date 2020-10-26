@@ -18,8 +18,6 @@ app.use((req, res, next) => {
     next();
 });
 
-const defNamespace = io.of('/');
-
 // https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
 function generateId(length) {
     var result           = '';
@@ -30,7 +28,6 @@ function generateId(length) {
     }
     return result;
 }
-
 
 let LOBBIES = {};
 
