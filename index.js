@@ -1,12 +1,12 @@
 var app = require('express')();
 var http = require('https').createServer(app);
-var io = require('socket.io')(http);
+var io = require('socket.io')(http, { origins: 'http://localhost:3000'});
 var chess = require('./piece');
 
 // app.use((req, res) => res.sendFile('/index.html', { root: __dirname }));
 
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Origin', req.headers.origin);
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
     next();
