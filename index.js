@@ -48,7 +48,17 @@ class LOBBY {
     }
 }
 
-
+app.get('/', (req, res) => {
+    request(
+        { url: `https://api.rawg.io/api/games` },
+        (error, response, body) => {
+            if (error || response.statusCode !== 200) {
+                return res.status(500).json({ type: 'error', message: err.message });
+            }
+            res.json(JSON.parse(body));
+        }
+    )
+})
 
 io.on('connection', (socket) => {
     
