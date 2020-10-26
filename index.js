@@ -3,7 +3,7 @@ var http = require('https').createServer(app);
 var io = require('socket.io')(http, { origins: '*:*'});
 var chess = require('./piece');
 
-const _PORT = 8080;
+const _PORT = 3000;
 
 app.set('port', process.env.PORT || _PORT);
 
