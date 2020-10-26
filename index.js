@@ -1,6 +1,6 @@
 var app = require('express')();
 var http = require('https').createServer(app);
-var io = require('socket.io')(http, { origins: 'http://localhost:3000'});
+var io = require('socket.io')(http, { origins: '*:*'});
 var chess = require('./piece');
 
 // app.use((req, res) => res.sendFile('/index.html', { root: __dirname }));
