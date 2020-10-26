@@ -1,33 +1,21 @@
 var app = require('express')();
-var cors = require('cors');
-app.use(cors());
+
+app.use((req, res, next) => { // needs to be applies to app before being used
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+    next();
+});
+
 var http = require('http').createServer(app);
 var io = require('socket.io')(http);
 var chess = require('./piece');
-
-var corsOptions = {
-    origin: 'https://amadmonkey.github.io/',
-    optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
-}
-
-// http.use(cors());
-
-// https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
-function generateId(length) {
-    var result           = '';
-    var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    var charactersLength = characters.length;
-    for ( var i = 0; i < length; i++ ) {
-       result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-    return result;
-}
 
 let LOBBIES = {};
 
 class LOBBY {
     constructor({host=null}){
-        this.roomId = generateId(4);
+        this.roomId = this.generateId(4);
         this.host = host;
         this.host.roomId = this.roomId;
         this.host.isLight = Math.random() > 0.5;
@@ -45,6 +33,14 @@ class LOBBY {
     createGuest({guest=null}){
         this.guest = guest;
         this.guest.isLight = !this.host.isLight;
+    }
+    generateId({length = 4}){
+        // https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
+        let result, characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', charactersLength = characters.length;
+        for (let i = 0; i < length; i++ ) {
+            result += characters.charAt(Math.floor(Math.random() * charactersLength));
+        }
+        return result;
     }
 }
 
