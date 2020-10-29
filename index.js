@@ -1,171 +1,113 @@
-var app = require('express')();
 
+var app = require('express')();
 app.use((req, res, next) => { // needs to be applies to app before being used
     res.header('Access-Control-Allow-Origin', '*');
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
     next();
 });
-
 var http = require('http').createServer(app);
 var io = require('socket.io')(http);
-var chess = require('./piece');
+
+var PIECE_HELPER = require('./piece_helper');
+const Lobby = require('./class/Lobby');
+const {PIECE_NAMES, CHAT_TYPE, CASTLING_POSITION, SIDE} = require('./Constants');
+const Constants = require('./Constants');
 
 let LOBBIES = {};
 
-class LOBBY {
-    constructor({host=null}){
-        this.roomId = this.generateId(4);
-        this.host = host;
-        this.host.roomId = this.roomId;
-        this.host.isLight = Math.random() > 0.5;
-        this.guest = null;
-        this.turn = true;
-        this.chat = [{ type: 'START' }]
-        this.set = {
-            light: chess.SET({ isLight: true }),
-            dark: chess.SET({ isLight: false })
-        }
-    }
-    getId(){
-        return this.roomId;
-    }
-    createGuest({guest=null}){
-        this.guest = guest;
-        this.guest.isLight = !this.host.isLight;
-    }
-    generateId({length = 4}){
-        // https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
-        let result = '', characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', charactersLength = characters.length;
-        for (let i = 0; i < length; i++ ) {
-            result += characters.charAt(Math.floor(Math.random() * charactersLength));
-        }
-        console.log(result);
-        return result;
-    }
-}
-
 io.on('connection', (socket) => {
     
-    console.log('a user connected');
+    console.info('---- Client Connected', new Date());
 
     socket.on('create-room-request', (params) => {
-        console.log('create-room-request');
-        const newLobby = new LOBBY({host: params});
-        socket.user = params;
-        socket.join(newLobby.getId());
-        LOBBIES[newLobby.getId()] = newLobby;
-        socket.emit('create-room-response', LOBBIES[newLobby.getId()]);
+        console.info('create-room-request', params);
+        if(params.nickname.length > 0 && params.nickname.length < 11){
+            const newLobby = new Lobby({host: params});
+            LOBBIES[newLobby.getId()] = newLobby;
+            socket.user = params;
+            socket.join(newLobby.getId());
+            socket.emit('create-room-response', LOBBIES[newLobby.getId()]);
+        }
     });
 
     socket.on('join-room-request', (params) => {
-        console.log('join-room-request');
-        let LOBBY = LOBBIES[params.roomId];
-        if(LOBBY){
-            if(io.sockets.adapter.rooms[params.roomId].length < 2){
-                socket.user = params;
-                socket.join(params.roomId);
-                LOBBY.createGuest({guest: params});
-                io.in(params.roomId).emit('join-room-response', LOBBY);
-            } else if(LOBBY.host.nickname === params.nickname || LOBBY.guest.nickname === params.nickname){
-                socket.user = params;
-                socket.join(params.roomId);
-                io.in(params.roomId).emit('join-room-response', LOBBY);
+        console.info('join-room-request', params);
+        let Lobby = LOBBIES[params.roomId];
+        if(Lobby && params.nickname.length > 0 && params.nickname.length < 11 && params.roomId.length === 4){
+            if(Lobby.host.nickname !== params.nickname){
+                if(io.sockets.adapter.rooms[params.roomId].length < 2) {
+                    socket.user = params;
+                    socket.join(params.roomId);
+                    Lobby.createGuest({guest: params});
+                    io.in(params.roomId).emit('join-room-response', Lobby);
+                }
+            } else {
+                socket.emit('join-room-response', 'Nickname already being used'); // send only to the one trying to join: either incorrect roomId or room already has 2 clients
+                console.info('join-room-response', 'Nickname already being used');
             }
         } else {
-            socket.emit('join-room-response', null); // send only to the one trying to join: either incorrect roomId or room already has 2 clients
+            socket.emit('join-room-response', 'Room does not exist'); // send only to the one trying to join: either incorrect roomId or room already has 2 clients
+            console.info('join-room-response', 'Room does not exist');
         }
     })
 
     socket.on('leave-room', (params) => {
-        console.log('leave-room');
-        if(LOBBIES[params.roomId]) {
-            console.log('canceled room ' + params.roomId);
-            delete LOBBIES[params.roomId];
-        }
+        console.info('leave-room', params);
+        LOBBIES[params.roomId] && delete LOBBIES[params.roomId]
+        console.info('Canceled', params.roomId);
         io.in(params.roomId).emit('logout-response', params);
+        console.info('logout-response', params);
     });
 
     socket.on('chat-request', (params) => {
-        console.info('chat-request', params);
-        params.type = null;
-        LOBBIES[params.roomId].chat.push(params);
-        socket.to(params.roomId).emit('chat-response', LOBBIES[params.roomId].chat);
+        console.info(`${new Date()}-chat-request:`, params);
+        if(params.message.length > 0 && params.message.length < 51){
+            LOBBIES[params.roomId].chat.push({...params, type: null});
+            socket.to(params.roomId).emit('chat-response', LOBBIES[params.roomId].chat);
+        }
     });
 
-    socket.on('chat-typing', (params) => {
-        console.log('chat-typing');
-        console.info(params.nickname, 'is typing');
-        socket.to(params.roomId).emit('chat-typing', `${params.nickname} is typing...`);
-    });
+    socket.on('chat-typing', (params) => { socket.to(params.roomId).emit('chat-typing', `${params.nickname} is typing...`)});
 
     socket.on('chess-move-request', (params) => {
-        if(LOBBIES[params.roomId]){
+        console.info('chess-move-request', params);
+        let Lobby = LOBBIES[params.roomId];
+        if(Lobby){
+            let set, done, chatObj = {...params, type: CHAT_TYPE.move};
+            set = Lobby.set[params.holdingPiece.isLight ? SIDE.light : SIDE.dark]; // get moving side set
 
-            let set, rook = null, done;
-            set = LOBBIES[params.roomId].set[params.holdingPiece.isLight ? 'light':'dark'];
-
-            // if move is a castle, move the rook
-            // 1. if moving piece is king and is initial
-            // 2. if moved on C8 or G8 if dark or C1 or G1 if light
-            // 3. if rook on A8, H8, A1, H1 is initial
-            if(params.holdingPiece.pieceName === chess.PIECE_NAMES.KING && params.holdingPiece.isInitial){
-                let newRookPosition;
-                switch(params.newPosition){
-                    case 'C8': rook = 'A8'; newRookPosition = 'D8'; break;
-                    case 'G8': rook = 'H8'; newRookPosition = 'F8'; break;
-                    case 'C1': rook = 'A1'; newRookPosition = 'D1'; break;
-                    case 'G1': rook = 'H1'; newRookPosition = 'F1'; break;
-                    default: break;
-                }
-                // rook = set.filter(obj => obj.position === rook && obj.isInitial);
-                // rook.fromPosition = rook.position;
-                // rook.position = newRookPosition;
-                // rook.isInitial = false;
-                // params.type = 'CASTLE';
-                for(let x = 0; x < set.length; x++){
-                    if(set[x].position === rook){
-                        set[x].fromPosition = set[x].position;
-                        set[x].position = newRookPosition;
-                        set[x].isInitial = false;
-                        params.rook = set[x];
-                        params.type = 'CASTLE';
-                        break;
-                    }
-                }
+            // if the move is a castle, move the rook first
+            if(params.holdingPiece.pieceName === PIECE_NAMES.king && params.holdingPiece.isInitial && params.newPosition in CASTLING_POSITION) {
+                let i = set.findIndex(obj => obj.position === CASTLING_POSITION[params.newPosition].at && obj.isInitial);
+                set[i].setPosition({newPosition: CASTLING_POSITION[params.newPosition].new});
+                chatObj = { ...chatObj, rook: set[i], type: CHAT_TYPE.castle }
             }
 
-            // move / change position
-            for(let x = 0; x < set.length; x++){
-                if(set[x].id === params.holdingPiece.id){
-                    params.type = params.type ? params.type : 'MOVE';
-                    params.fromPosition = set[x].position;
-                    set[x].position = params.newPosition;
-                    set[x].isInitial = false;
-                    break;
-                }
-            }
+            // move / change moving piece's position
+            set.find(obj => obj.id === params.holdingPiece.id );
+            let i = set.findIndex(obj => obj.id === params.holdingPiece.id);
+            chatObj.fromPosition = set[i].position;
+            set[i].setPosition(params);
 
-            // if eating update the opposing piece
-            if(params.opponentPiece){ 
-                if(params.opponentPiece.pieceName === chess.PIECE_NAMES.KING){ // if opponent piece is king game done. skip looping
+            // if the move was a capture update the opposing piece
+            if(params.opponentPiece) {
+                if(params.opponentPiece.pieceName === PIECE_NAMES.king) { // if opponent piece is a king game done. skip looping
                     done = socket.user;
-                } else {
-                    set = LOBBIES[params.roomId].set[!params.holdingPiece.isLight ? 'light':'dark'];
-                    for(let x = 0; x < set.length; x++){
-                        if(set[x].id === params.opponentPiece.id){
-                            params.type = 'BATTLE';
-                            set[x].active = false;
-                            break;
-                        }
-                    }
+                } else { // else normal capture process
+                    set = Lobby.set[!params.holdingPiece.isLight ? SIDE.light : SIDE.dark];
+                    let i = set.findIndex(obj => obj.id === params.opponentPiece.id);
+                    chatObj.type = CHAT_TYPE.battle;
+                    set[i].capture();
                 }
             }
-    
-            LOBBIES[params.roomId].chat.push(params);
-            LOBBIES[params.roomId].turn = !params.holdingPiece.isLight;
-            io.in(params.roomId).emit('chat-response', LOBBIES[params.roomId].chat, !params.holdingPiece.isLight, done);
-            !done && io.in(params.roomId).emit('chess-move-response', !params.holdingPiece.isLight, LOBBIES[params.roomId].set[params.holdingPiece.isLight ? 'light':'dark'], LOBBIES[params.roomId].set[params.holdingPiece.isLight ? 'dark':'light'], done);
+
+            Lobby.setValidTiles();
+
+            Lobby.chat.push(chatObj); // push new game chat into chat
+            Lobby.turn = !params.holdingPiece.isLight;
+            io.in(params.roomId).emit('chat-response', Lobby.chat, !params.holdingPiece.isLight, done);
+            !done && io.in(params.roomId).emit('chess-move-response', !params.holdingPiece.isLight, Lobby.set[params.holdingPiece.isLight ? SIDE.light : SIDE.dark], Lobby.set[params.holdingPiece.isLight ? SIDE.dark : SIDE.light]);
         } else {
             socket.emit('logout');
         }
@@ -189,8 +131,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', (params) => {
-        console.log('a user disconnected', params);
-        socket.emit('chat message', 'a user disconnected');
+        console.info('---- Client Disconnected', params);
     });
 
 });
