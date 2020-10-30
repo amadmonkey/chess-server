@@ -46,9 +46,6 @@ class Piece {
                 } else { // specific tile
                     let x = eval(`${this.position.substring(1,2)}${this.isLight ? (ruleX.substring(0,1) === '-' ? '+':'-') : ''}${this.isLight ? Math.abs(ruleX) : ruleX.length > 1 ? ruleX : "+0"}`);
                     let y = String.fromCharCode(eval(this.position.substring(0,1).charCodeAt(0) + (ruleY.length > 1 ? ruleY : "+0")));
-                    if(this.pieceName === 'PAWN'){
-                        // debugger
-                    }
                     tileObj = testConditions(this, ruleObj.conditions, x, y, set);
                     if(tileObj.valid) tiles.push(tileObj);
                 }
