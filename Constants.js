@@ -16,10 +16,11 @@ const CONDITION = {
     no_before: 'NO_BEFORE'
 }
 
-const CHAT_TYPE = {
+const MOVE_TYPE = {
     move: "MOVE",
     battle: "BATTLE",
-    castle: "CASTLE"
+    castle: "CASTLE",
+    self: "SELF"
 }
 
 const CASTLING_POSITION = {
@@ -53,7 +54,7 @@ const SIDE = {
 module.exports = {
     CONDITION: CONDITION,
     PIECE_NAMES: PIECE_NAMES,
-    CHAT_TYPE: CHAT_TYPE,
+    MOVE_TYPE: MOVE_TYPE,
     CASTLING_POSITION: CASTLING_POSITION,
     SIDE: SIDE
 };

@@ -1,4 +1,4 @@
-const {PIECE_NAMES, CONDITION, SIDE, CASTLING_POSITION} = require('../Constants');
+const {PIECE_NAMES, CONDITION, SIDE, CASTLING_POSITION, MOVE_TYPE} = require('../Constants');
 
 class Piece {
     constructor({ index = "", isLight = "", pieceName = "", position = "" }){
@@ -29,8 +29,8 @@ class Piece {
                             let x = eval(`${this.position.substring(1,2)}${this.isLight ? (isUp ? '+' : '-') : (isUp ? '-' : '+')}${i+1}`);
                             let y = String.fromCharCode(eval(this.position.substring(0,1).charCodeAt(0) + (ruleY.length > 1 ? ruleY : "+0")));
                             tileObj = testConditions(this, ruleObj.conditions, x, y, set);
-                            if(tileObj.valid) tiles.push({ tile: `${y}${x}`, castle: tileObj.castling});
-                            if(tileObj.stop) {break;}
+                            if(tileObj.valid) tiles.push(tileObj);
+                            if(tileObj.stop) break;
                         }
                     }
                 } else if (ruleY === "*") { // all tiles along y axis
@@ -39,8 +39,8 @@ class Piece {
                             let x = this.position.substring(1,2);
                             let y = String.fromCharCode(eval(`${this.position.substring(0,1).charCodeAt(0)}${this.isLight ? (isLeft ? '+' : '-') : (isLeft ? '-' : '+')}${i+1}`));
                             tileObj = testConditions(this, ruleObj.conditions, x, y, set);
-                            if(tileObj.valid) tiles.push({ tile: `${y}${x}`, castle: tileObj.castling});
-                            if(tileObj.stop) {break;}
+                            if(tileObj.valid) tiles.push(tileObj);
+                            if(tileObj.stop) break;
                         }
                     }
                 } else { // specific tile
@@ -50,7 +50,7 @@ class Piece {
                         // debugger
                     }
                     tileObj = testConditions(this, ruleObj.conditions, x, y, set);
-                    if(tileObj.valid) tiles.push({ tile: `${y}${x}`, castle: tileObj.castling});
+                    if(tileObj.valid) tiles.push(tileObj);
                 }
             } else {
                 for(let z = 0; z < 4; z++){
@@ -65,20 +65,14 @@ class Piece {
                     for(let i = 0; i < 8; i++){
                         let x = eval(`${this.position.substring(1,2)}${this.isLight ? axis.x : axis.y}${i+1}`);
                         let y = String.fromCharCode(eval(`${this.position.substring(0,1).charCodeAt(0)}${this.isLight ? axis.y : axis.x }${i+1}`));
-                        if(this.pieceName === 'QUEEN'){
-                            let test = "test";
-                        }
-
                         tileObj = testConditions(this, ruleObj.conditions, x, y, set);
-                        if(tileObj.valid) tiles.push({ tile: `${y}${x}`, castle: tileObj.castling});
-                        if(tileObj.stop) {
-                            break;
-                        }
+                        if(tileObj.valid) tiles.push(tileObj);
+                        if(tileObj.stop) break;
                     }
                 }
             }
         })
-        this.validTiles = tiles;
+        this.validTiles = [...tiles, {tile: this.position, type: MOVE_TYPE.self}];
     }
     capture(){
         this.active = false;
@@ -87,12 +81,14 @@ class Piece {
 
 const testConditions = (piece, conditions, x, y, set) => { // class tile with each rule. tile is valid until proven otherwise
     if(['A','B','C','D','E','F','G','H'].includes(y) && x >=1 && x <= 8){
-        let res = { valid: true, castling: false, stop: false };
+        
+        // declarations
         let hasAlly = set[piece.isLight ? SIDE.light : SIDE.dark].filter(obj => obj.position === `${y}${x}` && obj.active).length;
         let hasOpponent = set[piece.isLight ? SIDE.dark : SIDE.light].filter(obj => obj.position === `${y}${x}` && obj.active).length;
+        let res = { tile: `${y}${x}`, valid: true, type: hasOpponent ? MOVE_TYPE.battle : MOVE_TYPE.move, stop: false };
     
         // since no one piece can capture an allied piece, check for this first before looping through conditions
-        if(hasAlly) return { valid: false, castling: false, stop: true }; 
+        if(hasAlly) return { valid: false, type: MOVE_TYPE.move, stop: true }; 
     
         // loop through conditions
         conditions.forEach((condition) => {
@@ -109,10 +105,10 @@ const testConditions = (piece, conditions, x, y, set) => { // class tile with ea
                     if(enPassantHasLightBetween || enPassantHasDarkBetween) res.valid = false;
                     break;
                 case CONDITION.has_opponent:
-                    if(!hasOpponent) res.valid = false;
+                    if(!hasOpponent) res.valid = false, res.type = MOVE_TYPE.battle;
                     break
                 case CONDITION.until_opponent:
-                    if(hasOpponent) res.stop = true;
+                    if(hasOpponent) res.stop = true, res.type = MOVE_TYPE.battle;
                     break;
                 case CONDITION.castling:
                     if(piece.isInitial){
@@ -120,15 +116,17 @@ const testConditions = (piece, conditions, x, y, set) => { // class tile with ea
                         let castleHasDarkBetween = set[SIDE.dark].filter(obj => CASTLING_POSITION[`${y}${x}`].no.includes(obj.position) && obj.active).length;
                         res.valid = !castleHasLightBetween && !castleHasDarkBetween;
                     }
-                    res.castling = res.valid;
+                    res.type = res.valid ? MOVE_TYPE.castle : MOVE_TYPE.move;
                     break;
                 default:
                     break;
             }
         });
+
         return res;
+        
     } else {
-        return { valid: false, castling: false, stop: true }; 
+        return { valid: false, type: MOVE_TYPE.move, stop: true }; 
     }
 }
 
@@ -145,133 +143,49 @@ const getPieceRules = (pieceName) => {
     switch(pieceName){
         case PIECE_NAMES.pawn:
             return [
-                {
-                    rule:'x-1:y0',
-                    conditions: [CONDITION.no_piece]
-                },
-                {
-                    rule: 'x-2:y0',
-                    conditions: [CONDITION.initial, CONDITION.no_piece, CONDITION.no_before]
-                },
-                {
-                    rule: 'x-1:y-1',
-                    conditions: [CONDITION.has_opponent]
-                },
-                {
-                    rule: 'x-1:y+1',
-                    conditions: [CONDITION.has_opponent]
-                }
+                { rule:'x-1:y0', conditions: [CONDITION.no_piece] },
+                { rule: 'x-2:y0', conditions: [CONDITION.initial, CONDITION.no_piece, CONDITION.no_before] },
+                { rule: 'x-1:y-1', conditions: [CONDITION.has_opponent] },
+                { rule: 'x-1:y+1', conditions: [CONDITION.has_opponent] }
             ];
         case PIECE_NAMES.rook:
             return [
-                {
-                    rule: 'x*:y0',
-                    conditions: [CONDITION.until_opponent]
-                },
-                {
-                    rule: 'x0:y*',
-                    conditions: [CONDITION.until_opponent]
-                }
+                { rule: 'x*:y0', conditions: [CONDITION.until_opponent] },
+                { rule: 'x0:y*', conditions: [CONDITION.until_opponent] }
             ];
         case PIECE_NAMES.knight:
             return [
-                {
-                    rule:'x-2:y-1',
-                    conditions: []
-                },
-                {
-                    rule:'x-2:y+1',
-                    conditions: []
-                },
-                {
-                    rule:'x-1:y-2',
-                    conditions: []
-                },
-                {
-                    rule:'x-1:y+2',
-                    conditions: []
-                },
-                {
-                    rule:'x+1:y-2',
-                    conditions: []
-                },
-                {
-                    rule:'x+1:y+2',
-                    conditions: []
-                },
-                {
-                    rule:'x+2:y-1',
-                    conditions: []
-                },
-                {
-                    rule:'x+2:y+1',
-                    conditions: []
-                }
+                { rule:'x-2:y-1', conditions: [] },
+                { rule:'x-2:y+1', conditions: [] },
+                { rule:'x-1:y-2', conditions: [] },
+                { rule:'x-1:y+2', conditions: [] },
+                { rule:'x+1:y-2', conditions: [] },
+                { rule:'x+1:y+2', conditions: [] },
+                { rule:'x+2:y-1', conditions: [] },
+                { rule:'x+2:y+1', conditions: [] }
             ];
         case PIECE_NAMES.bishop:
             return [
-                {
-                    rule: 'x*=y*',
-                    conditions: [CONDITION.until_opponent]
-                }
+                { rule: 'x*=y*', conditions: [CONDITION.until_opponent] }
             ];
         case PIECE_NAMES.queen:
             return [
-                {
-                    rule: 'x*:y0',
-                    conditions: [CONDITION.until_opponent]
-                },
-                {
-                    rule: 'x0:y*',
-                    conditions: [CONDITION.until_opponent]
-                },
-                {
-                    rule: 'x*=y*',
-                    conditions: [CONDITION.until_opponent]
-                }
+                { rule: 'x*:y0', conditions: [CONDITION.until_opponent] },
+                { rule: 'x0:y*', conditions: [CONDITION.until_opponent] },
+                { rule: 'x*=y*', conditions: [CONDITION.until_opponent] }
             ];
         case PIECE_NAMES.king:
             return [
-                {
-                    rule:'x-1:y-1',
-                    conditions: []
-                },
-                {
-                    rule:'x-1:y0',
-                    conditions: []
-                },
-                {
-                    rule:'x-1:y+1',
-                    conditions: []
-                },
-                {
-                    rule:'x0:y-1',
-                    conditions: []
-                },
-                {
-                    rule:'x0:y+1',
-                    conditions: []
-                },
-                {
-                    rule:'x+1:y-1',
-                    conditions: []
-                },
-                {
-                    rule:'x+1:y0',
-                    conditions: []
-                },
-                {
-                    rule:'x+1:y+1',
-                    conditions: []
-                },
-                {
-                    rule: 'x0:y-2',
-                    conditions: [CONDITION.initial, CONDITION.castling]
-                },
-                {
-                    rule: 'x0:y+2',
-                    conditions: [CONDITION.initial, CONDITION.castling]
-                }
+                { rule:'x-1:y-1', conditions: [] },
+                { rule:'x-1:y0', conditions: [] },
+                { rule:'x-1:y+1', conditions: [] },
+                { rule:'x0:y-1', conditions: [] },
+                { rule:'x0:y+1', conditions: [] },
+                { rule:'x+1:y-1', conditions: [] },
+                { rule:'x+1:y0', conditions: [] },
+                { rule:'x+1:y+1', conditions: [] },
+                { rule: 'x0:y-2', conditions: [CONDITION.initial, CONDITION.castling, CONDITION.no_piece] },
+                { rule: 'x0:y+2', conditions: [CONDITION.initial, CONDITION.castling, CONDITION.no_piece] }
             ];
     }
 }

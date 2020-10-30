@@ -9,10 +9,8 @@ app.use((req, res, next) => { // needs to be applies to app before being used
 var http = require('http').createServer(app);
 var io = require('socket.io')(http);
 
-var PIECE_HELPER = require('./piece_helper');
 const Lobby = require('./class/Lobby');
-const {PIECE_NAMES, CHAT_TYPE, CASTLING_POSITION, SIDE} = require('./Constants');
-const Constants = require('./Constants');
+const {PIECE_NAMES, MOVE_TYPE, CASTLING_POSITION, SIDE} = require('./Constants');
 
 let LOBBIES = {};
 
@@ -74,14 +72,14 @@ io.on('connection', (socket) => {
         console.info('chess-move-request', params);
         let Lobby = LOBBIES[params.roomId];
         if(Lobby){
-            let set, done, chatObj = {...params, type: CHAT_TYPE.move};
+            let set, done, chatObj = {...params, type: MOVE_TYPE.move};
             set = Lobby.set[params.holdingPiece.isLight ? SIDE.light : SIDE.dark]; // get moving side set
 
-            // if the move is a castle, move the rook first
+            // if move is a castle, move the rook first
             if(params.holdingPiece.pieceName === PIECE_NAMES.king && params.holdingPiece.isInitial && params.newPosition in CASTLING_POSITION) {
                 let i = set.findIndex(obj => obj.position === CASTLING_POSITION[params.newPosition].at && obj.isInitial);
                 set[i].setPosition({newPosition: CASTLING_POSITION[params.newPosition].new});
-                chatObj = { ...chatObj, rook: set[i], type: CHAT_TYPE.castle }
+                chatObj = { ...chatObj, rook: set[i], type: MOVE_TYPE.castle }
             }
 
             // move / change moving piece's position
@@ -97,7 +95,7 @@ io.on('connection', (socket) => {
                 } else { // else normal capture process
                     set = Lobby.set[!params.holdingPiece.isLight ? SIDE.light : SIDE.dark];
                     let i = set.findIndex(obj => obj.id === params.opponentPiece.id);
-                    chatObj.type = CHAT_TYPE.battle;
+                    chatObj.type = MOVE_TYPE.battle;
                     set[i].capture();
                 }
             }
