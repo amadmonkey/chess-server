@@ -45,8 +45,8 @@ io.on('connection', (socket) => {
                 console.info('join-room-response', 'Nickname already being used');
             }
         } else {
-            socket.emit('join-room-response', 'Room does not exist'); // send only to the one trying to join: either incorrect roomId or room already has 2 clients
-            console.info('join-room-response', 'Room does not exist');
+            socket.emit('join-room-response', 'Room not existing'); // send only to the one trying to join: either incorrect roomId or room already has 2 clients
+            console.info('join-room-response', 'Room not existing');
         }
     })
 
