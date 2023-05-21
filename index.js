@@ -135,4 +135,7 @@ io.on('connection', (socket) => {
 });
 
 const _PORT = process.env.PORT || 8080;
-http.listen(_PORT, () => console.log(`listening on *:${_PORT}`));
+http.listen(_PORT, '0.0.0.0', err => {
+    if(err) throw err
+    console.log(`listening on *:${_PORT}`)
+});
