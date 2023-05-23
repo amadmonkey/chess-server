@@ -3,14 +3,14 @@ const Constants = require('../Constants');
 const { SIDE } = require('../Constants');
 
 class LOBBY {
-    constructor({host=null}){
+    constructor({host=null,chat=null}){
         this.roomId = this.generateId(4);
         this.host = host;
         this.host.roomId = this.roomId;
         this.host.isLight = Math.random() > 0.5;
         this.guest = null;
         this.turn = true;
-        this.chat = [{ type: 'START' }]
+        this.chat = null;
         this.set = {
             LIGHT: PieceHelper.SET({ isLight: true }),
             DARK: PieceHelper.SET({ isLight: false })

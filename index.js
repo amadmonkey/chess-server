@@ -21,7 +21,7 @@ io.on('connection', (socket) => {
     socket.on('create-room-request', (params) => {
         console.info('create-room-request', params);
         if(params.nickname.length > 0 && params.nickname.length < 11){
-            const newLobby = new Lobby({host: params});
+            const newLobby = new Lobby({host: params, chat: [{ type: 'START', date: new Date() }]});
             LOBBIES[newLobby.getId()] = newLobby;
             socket.user = params;
             socket.join(newLobby.getId());
