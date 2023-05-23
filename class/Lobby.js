@@ -10,7 +10,7 @@ class LOBBY {
         this.host.isLight = Math.random() > 0.5;
         this.guest = null;
         this.turn = true;
-        this.chat = null;
+        this.chat = chat;
         this.set = {
             LIGHT: PieceHelper.SET({ isLight: true }),
             DARK: PieceHelper.SET({ isLight: false })
