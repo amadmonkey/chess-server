@@ -61,7 +61,7 @@ io.on('connection', (socket) => {
     socket.on('chat-request', (params) => {
         console.info(`${new Date()}-chat-request:`, params);
         if(params.message.length > 0 && params.message.length < 51){
-            LOBBIES[params.roomId].chat.push({...params, type: null});
+            LOBBIES[params.roomId].chat.push({...params, type: null, date: new Date()});
             socket.to(params.roomId).emit('chat-response', LOBBIES[params.roomId].chat);
         }
     });
@@ -102,7 +102,7 @@ io.on('connection', (socket) => {
 
             Lobby.setValidTiles();
 
-            Lobby.chat.push(chatObj); // push new game chat into chat
+            Lobby.chat.push({ ...chatObj, ...{ date: new Date() } }); // push new game chat into chat
             Lobby.turn = !params.holdingPiece.isLight;
             io.in(params.roomId).emit('chat-response', Lobby.chat, !params.holdingPiece.isLight, done);
             !done && io.in(params.roomId).emit('chess-move-response', !params.holdingPiece.isLight, Lobby.set[params.holdingPiece.isLight ? SIDE.light : SIDE.dark], Lobby.set[params.holdingPiece.isLight ? SIDE.dark : SIDE.light]);
